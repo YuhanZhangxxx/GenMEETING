@@ -8,6 +8,7 @@ import RescheduleModal from "@/components/RescheduleModal";
 import CancelModal from "@/components/CancelModal";
 import RequestChangeModal from "@/components/RequestChangeModal";
 import MonthCalendarView from "@/components/MonthCalendarView";
+import WeekCalendarView from "@/components/WeekCalendarView";
 
 function groupByDay(events: MeetingEvent[]): Record<string, MeetingEvent[]> {
   return events.reduce<Record<string, MeetingEvent[]>>((acc, e) => {
@@ -32,7 +33,7 @@ const RSVP_COLOR: Record<string, string> = {
 };
 
 interface Props {
-  view?: "list" | "month";
+  view?: "list" | "week" | "month";
   refreshKey?: number;
   onRefresh?: () => void;
 }
@@ -159,6 +160,22 @@ export default function CalendarView({
     return (
       <>
         <MonthCalendarView
+          events={events}
+          onReschedule={setRescheduleTarget}
+          onCancel={setCancelTarget}
+          onRequestChange={setRequestChangeTarget}
+          onRsvpSuccess={handleSuccess}
+        />
+        {modals}
+      </>
+    );
+  }
+
+  // ── Week view ──
+  if (view === "week") {
+    return (
+      <>
+        <WeekCalendarView
           events={events}
           onReschedule={setRescheduleTarget}
           onCancel={setCancelTarget}

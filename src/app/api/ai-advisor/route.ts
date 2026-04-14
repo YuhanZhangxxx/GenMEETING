@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
-  console.log("[ai-advisor] key prefix:", apiKey ? apiKey.slice(0, 10) + "..." : "MISSING");
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[ai-advisor] key prefix:", apiKey ? apiKey.slice(0, 10) + "..." : "MISSING");
+  }
 
   if (!apiKey || apiKey === "sk-...") {
     return NextResponse.json(
@@ -125,6 +127,9 @@ STRICT RULES — only suggest things you can observe from the data above:
     return NextResponse.json({ suggestions });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "AI advisor error";
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[ai-advisor] OpenAI error:", message);
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

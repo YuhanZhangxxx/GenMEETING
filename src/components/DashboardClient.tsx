@@ -11,7 +11,7 @@ interface Props {
 }
 
 type RightTab = "ai" | "slots";
-type CalView = "list" | "month";
+type CalView = "list" | "week" | "month";
 
 const DURATION_OPTIONS = [30, 45, 60] as const;
 type Duration = (typeof DURATION_OPTIONS)[number];
@@ -37,19 +37,20 @@ export default function DashboardClient({ durationMinutes }: Props) {
           <h2 className="text-lg font-bold text-slate-800">Upcoming Meetings</h2>
 
           <div className="flex items-center gap-2">
-            {/* List / Month toggle */}
+            {/* List / Week / Month toggle */}
             <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
               <button
                 onClick={() => setCalView("list")}
                 title="List view"
+                aria-label="List view"
+                aria-pressed={calView === "list"}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                   calView === "list"
                     ? "bg-white text-slate-800 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                {/* List icon */}
-                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                   <rect x="0" y="2" width="16" height="2" rx="1" />
                   <rect x="0" y="7" width="16" height="2" rx="1" />
                   <rect x="0" y="12" width="16" height="2" rx="1" />
@@ -57,16 +58,37 @@ export default function DashboardClient({ durationMinutes }: Props) {
                 List
               </button>
               <button
+                onClick={() => setCalView("week")}
+                title="Week view"
+                aria-label="Week view"
+                aria-pressed={calView === "week"}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  calView === "week"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <rect x="1" y="3" width="2" height="11" rx="0.5" />
+                  <rect x="4" y="3" width="2" height="11" rx="0.5" />
+                  <rect x="7" y="3" width="2" height="11" rx="0.5" />
+                  <rect x="10" y="3" width="2" height="11" rx="0.5" />
+                  <rect x="13" y="3" width="2" height="11" rx="0.5" />
+                </svg>
+                Week
+              </button>
+              <button
                 onClick={() => setCalView("month")}
                 title="Month view"
+                aria-label="Month view"
+                aria-pressed={calView === "month"}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                   calView === "month"
                     ? "bg-white text-slate-800 shadow-sm"
                     : "text-slate-500 hover:text-slate-700"
                 }`}
               >
-                {/* Calendar icon */}
-                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                   <path d="M4 1a1 1 0 0 1 1 1v1h6V2a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h1V2a1 1 0 0 1 1-1zm9 4H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zm-7 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm3 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm3 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm-6 3a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm3 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
                 </svg>
                 Month
