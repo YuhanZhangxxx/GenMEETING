@@ -1,14 +1,13 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getAnySession } from "@/lib/get-session";
 import { prisma } from "@/lib/prisma";
 import { fetchGoogleEvents } from "@/lib/google-calendar";
 import { fetchOutlookEvents } from "@/lib/microsoft-calendar";
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(req: NextRequest) {
+  const session = await getAnySession(req);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

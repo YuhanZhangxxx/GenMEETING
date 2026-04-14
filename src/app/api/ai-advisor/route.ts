@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getAnySession } from "@/lib/get-session";
 import { prisma } from "@/lib/prisma";
 import OpenAI from "openai";
 import { format } from "date-fns";
@@ -19,8 +18,8 @@ export interface AISuggestion {
   };
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(req: NextRequest) {
+  const session = await getAnySession(req);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
