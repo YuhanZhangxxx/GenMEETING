@@ -25,8 +25,8 @@ CACHE_TTL_SECONDS = 5 * 60
 # ─── Pydantic models ─────────────────────────────────────────────────────────
 
 class AttendeeDTO(BaseModel):
-    email: str
-    responseStatus: str
+    email: str = ""
+    responseStatus: str = "needsAction"
     self: bool = False
 
 
@@ -91,6 +91,18 @@ def _to_dto(event: Any, user_email: str) -> EventDTO:
         attendees_raw = json.loads(event.attendees or "[]")
     except Exception:
         attendees_raw = []
+    # Whitelist only fields the DTO accepts so stray data doesn't blow it up.
+    attendees_clean = []
+    for a in attendees_raw:
+        if not isinstance(a, dict):
+            continue
+        attendees_clean.append(
+            AttendeeDTO(
+                email=str(a.get("email") or ""),
+                responseStatus=str(a.get("responseStatus") or "needsAction"),
+                self=bool(a.get("self", False)),
+            )
+        )
     return EventDTO(
         id=event.id,
         googleEventId=event.googleEventId,
@@ -106,7 +118,7 @@ def _to_dto(event: Any, user_email: str) -> EventDTO:
         canRespond=not is_organizer,
         canRequestChange=not is_organizer,
         organizerEmail=event.organizerEmail,
-        attendees=[AttendeeDTO(**a) for a in attendees_raw],
+        attendees=attendees_clean,
         myResponseStatus=event.myResponseStatus,
         meetingLink=event.meetingLink,
         userEmail=user_email,
@@ -299,6 +311,8 @@ async def create_event(
             attendees=body.attendees,
             add_meet_link=body.addMeetLink,
         )
+        # Invalidate cache so the next GET /events re-syncs and picks this up.
+        await prisma.calendareventcache.delete_many(where={"userId": user_id})
         return CreateEventResponse(
             eventId=created.get("id", ""),
             htmlLink=created.get("htmlLink"),
@@ -314,6 +328,7 @@ async def create_event(
             attendees=body.attendees,
             add_meet_link=body.addMeetLink,
         )
+        await prisma.calendareventcache.delete_many(where={"userId": user_id})
         meet = (created.get("onlineMeeting") or {}).get("joinUrl")
         return CreateEventResponse(
             eventId=created.get("id", ""),
