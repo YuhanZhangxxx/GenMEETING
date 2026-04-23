@@ -1,5 +1,8 @@
-from fastapi import FastAPI, Depends
+import traceback
+
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,6 +32,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def uncaught_exception_handler(request: Request, exc: Exception):
+    """Always return JSON for uncaught errors so the mobile client can parse them."""
+    tb = traceback.format_exc()
+    # Log full traceback server-side for debugging.
+    print(f"[ERROR] {request.method} {request.url.path}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": str(exc) or exc.__class__.__name__},
+    )
 
 app.include_router(auth_routes.router, prefix="/api/auth")
 app.include_router(calendar_routes.router, prefix="/api/calendar")
