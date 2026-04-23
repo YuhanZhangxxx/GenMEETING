@@ -1,0 +1,179 @@
+// 和 ../../prisma/schema.prisma 的 model 定义保持一致。
+// 只改了 generator provider，指向 Python client。
+// 两边连的是同一个 SQLite 文件，互相不冲突。
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts          Account[]
+  sessions          Session[]
+  preferences       MeetingPreference?
+  cachedEvents      CalendarEventCache[]
+  rescheduleHistory RescheduleHistory[]
+  changeRequests    ChangeRequest[]
+  notifications     Notification[]
+  favoriteContacts  FavoriteContact[]
+  linkStates        LinkState[]
+}
+
+model Account {
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String?
+  access_token             String?
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String?
+  session_state            String?
+  refresh_token_expires_in Int?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model CalendarEventCache {
+  id               String   @id @default(cuid())
+  userId           String
+  googleEventId    String
+  source           String   @default("google")
+  title            String
+  startTime        DateTime
+  endTime          DateTime
+  allDay           Boolean  @default(false)
+  isEditable       Boolean  @default(false)
+  organizerEmail   String?
+  attendees        String   @default("[]")
+  myResponseStatus String?
+  meetingLink      String?
+  fetchedAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, googleEventId])
+  @@index([userId, startTime])
+}
+
+model MeetingPreference {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  workDays             String   @default("1,2,3,4,5")
+  workStart            String   @default("09:00")
+  workEnd              String   @default("18:00")
+  bufferMinutes        Int      @default(15)
+  blackoutTimes        String   @default("[]")
+  preferredSlotMinutes Int      @default(60)
+  timezone             String   @default("UTC")
+  autoReschedule       Boolean  @default(false)
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RescheduleHistory {
+  id            String    @id @default(cuid())
+  userId        String
+  googleEventId String?
+  action        String
+  originalStart DateTime?
+  newStart      DateTime?
+  newEnd        DateTime?
+  score         Float?
+  reason        String?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChangeRequest {
+  id              String   @id @default(cuid())
+  googleEventId   String
+  eventTitle      String
+  requesterUserId String
+  requesterEmail  String
+  organizerEmail  String
+  proposedSlots   String
+  reason          String?
+  status          String   @default("pending")
+  selectedSlot    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  requester User @relation(fields: [requesterUserId], references: [id], onDelete: Cascade)
+}
+
+model FavoriteContact {
+  id        String   @id @default(cuid())
+  userId    String
+  email     String
+  name      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, email])
+  @@index([userId])
+}
+
+model LinkState {
+  id        String   @id @default(cuid())
+  token     String   @unique @default(cuid())
+  userId    String
+  provider  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  relatedId String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}

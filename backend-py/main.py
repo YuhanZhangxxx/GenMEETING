@@ -6,12 +6,14 @@ load_dotenv()
 
 from auth.deps import require_user
 from auth.jwt_utils import MobileTokenPayload
+from db import prisma, lifespan
 
 
 app = FastAPI(
     title="MeetAI Python Backend",
     description="FastAPI version of the MeetAI backend, running alongside Next.js",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # 允许 Expo 和 Next.js 都能调
@@ -33,3 +35,13 @@ def health():
 def me(user: MobileTokenPayload = Depends(require_user)):
     """测试鉴权是否生效 — 需要合法 Bearer token。"""
     return {"user": user}
+
+
+@app.get("/api/stats")
+async def stats():
+    """DB 烟雾测试 — 数一下表里有多少记录。"""
+    return {
+        "users": await prisma.user.count(),
+        "events_cached": await prisma.calendareventcache.count(),
+        "accounts": await prisma.account.count(),
+    }
