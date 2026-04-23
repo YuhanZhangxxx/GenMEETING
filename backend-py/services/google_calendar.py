@@ -1,10 +1,10 @@
 """
-Google Calendar 服务，和 src/lib/google-calendar.ts 对等。
+Google Calendar service — mirrors src/lib/google-calendar.ts.
 
-职责：
-- 取用户的 Google access_token，过期自动刷新，写回数据库
-- 构建 Calendar API client
-- 拉事件 / 建事件 / 改时间
+Responsibilities:
+- Fetch the user's Google access_token, refresh it when expired, and write it back.
+- Build an authenticated Calendar API client.
+- List / create / patch / RSVP / delete events.
 """
 import os
 import time
@@ -23,7 +23,7 @@ TOKEN_URI = "https://oauth2.googleapis.com/token"
 
 
 async def get_valid_access_token(user_id: str) -> str:
-    """拿到可用的 access_token，快过期就刷新后回写 DB。"""
+    """Return a usable access_token, refreshing and persisting it if it's near expiry."""
     account = await prisma.account.find_first(
         where={"userId": user_id, "provider": "google"}
     )
@@ -38,7 +38,7 @@ async def get_valid_access_token(user_id: str) -> str:
     if not is_expired:
         return account.access_token
 
-    # 需要刷新
+    # Needs refresh.
     if not account.refresh_token:
         raise RuntimeError("No refresh token available.")
 
@@ -65,7 +65,7 @@ async def get_valid_access_token(user_id: str) -> str:
 
 
 async def get_calendar_client(user_id: str):
-    """带鉴权的 Google Calendar v3 client。"""
+    """Authenticated Google Calendar v3 client."""
     access_token = await get_valid_access_token(user_id)
     creds = Credentials(
         token=access_token,
@@ -73,12 +73,12 @@ async def get_calendar_client(user_id: str):
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
     )
-    # cache_discovery=False 避免 Windows 上的一个烦人 warning
+    # cache_discovery=False silences a noisy warning on Windows.
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
 
 async def fetch_google_events(user_id: str, days_ahead: int = 14) -> list:
-    """从用户 primary 日历取未来 N 天事件。"""
+    """Fetch events from the user's primary calendar for the next N days."""
     from datetime import datetime, timedelta, timezone
 
     service = await get_calendar_client(user_id)
@@ -109,7 +109,7 @@ async def create_google_event(
     attendees: Optional[list[str]] = None,
     add_meet_link: bool = False,
 ) -> dict:
-    """建日历事件。add_meet_link=True 会自动加个 Google Meet 链接。"""
+    """Create a calendar event. If add_meet_link is True, a Google Meet link is attached."""
     service = await get_calendar_client(user_id)
 
     body: dict = {
@@ -137,7 +137,7 @@ async def create_google_event(
 async def update_google_event_time(
     user_id: str, google_event_id: str, start_time: str, end_time: str
 ) -> dict:
-    """改已有事件的时间。"""
+    """Patch an existing event's start/end time."""
     service = await get_calendar_client(user_id)
     return (
         service.events()
@@ -156,10 +156,10 @@ async def update_google_event_time(
 async def respond_to_google_event(
     user_id: str, google_event_id: str, response: str
 ) -> dict:
-    """RSVP：accepted / declined / tentative。需要找到当前用户作为 attendee 并改他的 responseStatus。"""
+    """RSVP — accepted / declined / tentative. Finds the user among attendees and updates responseStatus."""
     service = await get_calendar_client(user_id)
 
-    # 先拿到用户邮箱（from Account.email 关联到 User）
+    # Resolve the current user's email so we know which attendee to update.
     user = await prisma.user.find_unique(where={"id": user_id})
     if not user or not user.email:
         raise RuntimeError("User email not found.")
@@ -175,7 +175,7 @@ async def respond_to_google_event(
             break
 
     if not updated:
-        # 用户不是 attendee，自己加上
+        # User wasn't in the attendee list — add them with the response.
         attendees.append({"email": my_email, "responseStatus": response, "self": True})
 
     return (
@@ -191,7 +191,7 @@ async def respond_to_google_event(
 
 
 async def cancel_google_event(user_id: str, google_event_id: str) -> None:
-    """取消（删除）事件。"""
+    """Delete the event."""
     service = await get_calendar_client(user_id)
     service.events().delete(
         calendarId="primary", eventId=google_event_id, sendUpdates="all"

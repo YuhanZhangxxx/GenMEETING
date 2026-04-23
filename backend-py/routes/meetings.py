@@ -1,9 +1,8 @@
 """
-会议操作端点：
-- POST /api/meetings/{id}/respond   RSVP（accepted/declined/tentative）
-- POST /api/meetings/{id}/cancel    取消会议
+Meeting action endpoints:
+- POST /api/meetings/{id}/respond   RSVP (accepted / declined / tentative)
+- POST /api/meetings/{id}/cancel    Cancel the meeting
 """
-import json
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -58,7 +57,7 @@ async def respond_to_meeting(
         else:
             await respond_to_google_event(user_id, event_id, body.response)
 
-        # 更新本地缓存
+        # Update local cache so the next GET /events reflects the new RSVP state.
         await prisma.calendareventcache.update_many(
             where={"userId": user_id, "googleEventId": event_id},
             data={"myResponseStatus": body.response},
@@ -88,7 +87,7 @@ async def cancel_meeting(
         else:
             await cancel_google_event(user_id, event_id)
 
-        # 从缓存里删
+        # Remove from local cache.
         await prisma.calendareventcache.delete_many(
             where={"userId": user_id, "googleEventId": event_id}
         )

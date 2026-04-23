@@ -1,5 +1,5 @@
 """
-FastAPI 的鉴权 Dependency。每个需要登录的端点写 user = Depends(require_user) 就行。
+FastAPI auth dependencies. Protected endpoints add `user = Depends(require_user)`.
 """
 from typing import Optional
 
@@ -17,7 +17,7 @@ def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
 
 
 def require_user(authorization: Optional[str] = Header(None)) -> MobileTokenPayload:
-    """必须登录的端点用这个。拿不到合法 token 就 401。"""
+    """Use on endpoints that require login. Returns 401 if no valid token."""
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(
@@ -36,7 +36,7 @@ def require_user(authorization: Optional[str] = Header(None)) -> MobileTokenPayl
 
 
 def optional_user(authorization: Optional[str] = Header(None)) -> Optional[MobileTokenPayload]:
-    """不强制登录的端点用这个，没 token 返回 None。"""
+    """Use on endpoints where auth is optional — returns None if no token."""
     token = _extract_bearer(authorization)
     if not token:
         return None

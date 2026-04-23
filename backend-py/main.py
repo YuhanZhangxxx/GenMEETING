@@ -19,11 +19,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(auth_routes.router, prefix="/api/auth")
-app.include_router(calendar_routes.router, prefix="/api/calendar")
-app.include_router(meetings_routes.router, prefix="/api/meetings")
-
-# 允许 Expo 和 Next.js 都能调
+# Open CORS so both Expo and Next.js can hit this service.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,6 +27,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_routes.router, prefix="/api/auth")
+app.include_router(calendar_routes.router, prefix="/api/calendar")
+app.include_router(meetings_routes.router, prefix="/api/meetings")
 
 
 @app.get("/health")
@@ -40,13 +40,13 @@ def health():
 
 @app.get("/api/me")
 def me(user: MobileTokenPayload = Depends(require_user)):
-    """测试鉴权是否生效 — 需要合法 Bearer token。"""
+    """Auth smoke test — requires a valid Bearer token."""
     return {"user": user}
 
 
 @app.get("/api/stats")
 async def stats():
-    """DB 烟雾测试 — 数一下表里有多少记录。"""
+    """DB smoke test — count rows in a few tables."""
     return {
         "users": await prisma.user.count(),
         "events_cached": await prisma.calendareventcache.count(),

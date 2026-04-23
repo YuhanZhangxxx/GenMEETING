@@ -1,6 +1,6 @@
 """
-Prisma client 单例。每个端点 `from db import prisma` 就能用。
-FastAPI 的 lifespan 钩子负责连接/断开。
+Prisma client singleton. Each endpoint can `from db import prisma` and use it.
+The FastAPI lifespan hook handles connect/disconnect.
 """
 from contextlib import asynccontextmanager
 

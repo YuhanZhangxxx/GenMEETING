@@ -1,7 +1,8 @@
 """
 POST /api/auth/mobile-token
-移动端 OAuth 登录入口：用 Google/Microsoft 的 access_token 换我们的 JWT。
-和 Next.js 的 src/app/api/auth/mobile-token/route.ts 对等。
+
+Mobile login entry point: exchange a provider (Google/Microsoft) access_token for
+our own JWT. Mirrors src/app/api/auth/mobile-token/route.ts on the Next.js side.
 """
 from typing import Literal, Optional
 
@@ -70,7 +71,7 @@ async def _verify_microsoft_token(access_token: str):
 
 @router.post("/mobile-token", response_model=MobileTokenResponse)
 async def mobile_token(body: MobileTokenRequest):
-    # 1. 找 provider 验证 access_token + 拿用户信息
+    # 1. Verify the provider's access_token and pull the user's profile.
     if body.provider == "google":
         info = await _verify_google_token(body.accessToken)
     else:
@@ -80,7 +81,7 @@ async def mobile_token(body: MobileTokenRequest):
     if not email:
         raise HTTPException(400, "Could not retrieve email from provider")
 
-    # 2. 找 / 建 user
+    # 2. Find or create the user.
     user = await prisma.user.find_unique(where={"email": email})
     if not user:
         user = await prisma.user.create(
@@ -91,7 +92,7 @@ async def mobile_token(body: MobileTokenRequest):
             }
         )
 
-    # 3. 更新 / 建 account 记录
+    # 3. Upsert the Account record so calendar services can find fresh tokens.
     provider_account_id = info["providerAccountId"]
     existing = await prisma.account.find_unique(
         where={
@@ -125,7 +126,7 @@ async def mobile_token(body: MobileTokenRequest):
             }
         )
 
-    # 4. 签 JWT 返回
+    # 4. Sign our own JWT and return it.
     token = sign_mobile_jwt(user.id, user.email or "")
 
     return MobileTokenResponse(

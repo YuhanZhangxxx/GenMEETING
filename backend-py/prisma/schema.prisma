@@ -1,6 +1,6 @@
-// 和 ../../prisma/schema.prisma 的 model 定义保持一致。
-// 只改了 generator provider，指向 Python client。
-// 两边连的是同一个 SQLite 文件，互相不冲突。
+// Mirrors ../../prisma/schema.prisma model-for-model.
+// Only difference: the generator provider targets the Python client.
+// Both sides point at the same SQLite file — they don't step on each other.
 
 generator client {
   provider             = "prisma-client-py"

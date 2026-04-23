@@ -1,7 +1,7 @@
 """
-日历相关端点：
-- GET  /api/calendar/events        列出未来 14 天事件（带缓存，5 分钟 TTL）
-- POST /api/calendar/create-event  在用户的主日历建事件
+Calendar endpoints:
+- GET  /api/calendar/events        List events for the next 14 days (cached, 5-min TTL)
+- POST /api/calendar/create-event  Create an event on the user's primary calendar
 """
 import json
 from datetime import datetime, timedelta, timezone
@@ -22,7 +22,7 @@ router = APIRouter()
 CACHE_TTL_SECONDS = 5 * 60
 
 
-# ─── Pydantic 模型 ───────────────────────────────────────────────────────────
+# ─── Pydantic models ─────────────────────────────────────────────────────────
 
 class AttendeeDTO(BaseModel):
     email: str
@@ -59,7 +59,7 @@ class EventsResponse(BaseModel):
 
 class CreateEventRequest(BaseModel):
     title: str
-    startTime: str  # ISO
+    startTime: str  # ISO timestamp
     endTime: str
     description: Optional[str] = None
     attendees: Optional[list[str]] = None
@@ -73,7 +73,7 @@ class CreateEventResponse(BaseModel):
     meetLink: Optional[str] = None
 
 
-# ─── 工具 ────────────────────────────────────────────────────────────────────
+# ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _map_outlook_response(r: Optional[str]) -> str:
     if r == "accepted":
@@ -113,14 +113,14 @@ def _to_dto(event: Any, user_email: str) -> EventDTO:
     )
 
 
-# ─── 端点 ────────────────────────────────────────────────────────────────────
+# ─── Endpoints ───────────────────────────────────────────────────────────────
 
 @router.get("/events", response_model=EventsResponse)
 async def get_events(user: MobileTokenPayload = Depends(require_user)):
     user_id = user["userId"]
     user_email = user["email"] or ""
 
-    # 1. 看缓存新不新鲜
+    # 1. Check cache freshness.
     latest = await prisma.calendareventcache.find_first(
         where={"userId": user_id},
         order={"fetchedAt": "desc"},
@@ -140,14 +140,14 @@ async def get_events(user: MobileTokenPayload = Depends(require_user)):
                 fromCache=True,
             )
 
-    # 2. 看用户连了哪些 provider
+    # 2. Figure out which providers the user has linked.
     accounts = await prisma.account.find_many(where={"userId": user_id})
     has_google = any(a.provider == "google" for a in accounts)
     has_ms = any(a.provider == "microsoft" for a in accounts)
 
     errors: list[str] = []
 
-    # 3. 同步 Google
+    # 3. Sync Google.
     if has_google:
         try:
             items = await fetch_google_events(user_id, 14)
@@ -211,7 +211,7 @@ async def get_events(user: MobileTokenPayload = Depends(require_user)):
             )
             errors.append("calendar_access_denied:google" if auth_err else f"google:{msg}")
 
-    # 4. 同步 Microsoft
+    # 4. Sync Microsoft.
     if has_ms:
         try:
             items = await fetch_outlook_events(user_id, 14)
@@ -220,7 +220,7 @@ async def get_events(user: MobileTokenPayload = Depends(require_user)):
                     continue
                 start_raw = it["start"]["dateTime"]
                 end_raw = it["end"]["dateTime"]
-                # Graph 返回的时间不带时区后缀，加个 Z 当 UTC 用
+                # Graph returns timestamps without timezone suffix — treat UTC as Z.
                 if it["start"].get("timeZone") == "UTC" and not start_raw.endswith("Z"):
                     start_raw += "Z"
                 if it["end"].get("timeZone") == "UTC" and not end_raw.endswith("Z"):
@@ -267,7 +267,7 @@ async def get_events(user: MobileTokenPayload = Depends(require_user)):
         except Exception as e:
             errors.append(f"microsoft:{str(e)}")
 
-    # 5. 如果所有错误都是 Google 的权限问题，给前端信号
+    # 5. If every error is a Google auth error, signal the UI to ask for re-consent.
     if errors and all(e == "calendar_access_denied:google" for e in errors):
         raise HTTPException(403, "calendar_access_denied")
 

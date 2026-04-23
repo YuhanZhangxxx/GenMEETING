@@ -1,11 +1,11 @@
 """
-JWT 签发和校验，跟 Next.js 的 src/lib/mobile-auth.ts 完全对等：
-- 算法: HS256
-- secret: 同一个 NEXTAUTH_SECRET
-- payload: { userId, email, iat, exp }
-- 有效期: 30 天
+JWT sign/verify — mirrors src/lib/mobile-auth.ts on the Next.js side:
+- Algorithm: HS256
+- Secret: the same NEXTAUTH_SECRET
+- Payload: { userId, email, iat, exp }
+- Expiry: 30 days
 
-这样 Next.js 发的 token 在 FastAPI 也认，反过来也通。
+Keeps tokens interchangeable — a JWT signed by Next.js is accepted here, and vice versa.
 """
 import os
 from datetime import datetime, timedelta, timezone

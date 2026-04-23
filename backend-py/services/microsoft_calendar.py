@@ -1,6 +1,6 @@
 """
-Microsoft Graph 日历服务，和 src/lib/microsoft-calendar.ts 对等。
-用 httpx 直接打 Graph REST API（Graph Python SDK 太重）。
+Microsoft Graph calendar service — mirrors src/lib/microsoft-calendar.ts.
+Hits the Graph REST API directly with httpx (the official Graph SDK is heavy).
 """
 import os
 import time
@@ -20,7 +20,7 @@ MS_SCOPE = (
 
 
 async def _refresh_ms_token(user_id: str) -> str:
-    """强制用 refresh_token 换一个新的 access_token，回写 DB。"""
+    """Force-refresh the Microsoft access_token using the stored refresh_token."""
     account = await prisma.account.find_first(
         where={"userId": user_id, "provider": "microsoft"}
     )
@@ -67,7 +67,7 @@ async def _refresh_ms_token(user_id: str) -> str:
 
 
 async def get_ms_access_token(user_id: str) -> str:
-    """有效 token，快过期就刷新。"""
+    """Return a valid token, refreshing when near expiry."""
     account = await prisma.account.find_first(
         where={"userId": user_id, "provider": "microsoft"}
     )
@@ -88,7 +88,7 @@ async def _graph_fetch(
     method: str = "GET",
     json_body: Optional[dict] = None,
 ) -> Any:
-    """Graph 请求通用方法，401 自动刷新 token 重试一次。"""
+    """Generic Graph request helper. On 401, force-refresh token once and retry."""
     async def do_request(token: str) -> httpx.Response:
         async with httpx.AsyncClient(timeout=20.0) as client:
             return await client.request(
@@ -105,7 +105,7 @@ async def _graph_fetch(
     resp = await do_request(token)
 
     if resp.status_code == 401:
-        # 强刷再试一次
+        # Force refresh once and retry.
         token = await _refresh_ms_token(user_id)
         resp = await do_request(token)
 
@@ -187,9 +187,7 @@ async def delete_outlook_event(user_id: str, outlook_event_id: str) -> None:
 async def respond_to_outlook_event(
     user_id: str, outlook_event_id: str, response: str
 ) -> Any:
-    """
-    response 必须是 accept / decline / tentativelyAccept。
-    """
+    """response must be one of accept / decline / tentativelyAccept."""
     if response not in ("accept", "decline", "tentativelyAccept"):
         raise ValueError("invalid response")
     return await _graph_fetch(
