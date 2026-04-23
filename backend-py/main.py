@@ -8,6 +8,7 @@ from auth.deps import require_user
 from auth.jwt_utils import MobileTokenPayload
 from db import prisma, lifespan
 from routes import auth as auth_routes
+from routes import calendar as calendar_routes
 
 
 app = FastAPI(
@@ -18,6 +19,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_routes.router, prefix="/api/auth")
+app.include_router(calendar_routes.router, prefix="/api/calendar")
 
 # 允许 Expo 和 Next.js 都能调
 app.add_middleware(
