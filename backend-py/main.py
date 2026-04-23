@@ -10,6 +10,7 @@ from db import prisma, lifespan
 from routes import auth as auth_routes
 from routes import calendar as calendar_routes
 from routes import meetings as meetings_routes
+from routes import recommendations as recommendations_routes
 
 
 app = FastAPI(
@@ -31,6 +32,7 @@ app.add_middleware(
 app.include_router(auth_routes.router, prefix="/api/auth")
 app.include_router(calendar_routes.router, prefix="/api/calendar")
 app.include_router(meetings_routes.router, prefix="/api/meetings")
+app.include_router(recommendations_routes.router, prefix="/api/recommendations")
 
 
 @app.get("/health")
