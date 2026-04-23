@@ -40,7 +40,9 @@ async def get_valid_access_token(user_id: str) -> str:
 
     # Needs refresh.
     if not account.refresh_token:
-        raise RuntimeError("No refresh token available.")
+        raise RuntimeError(
+            "Google session expired — please sign in again on mobile."
+        )
 
     creds = Credentials(
         token=account.access_token,
@@ -49,7 +51,15 @@ async def get_valid_access_token(user_id: str) -> str:
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
     )
-    creds.refresh(Request())
+    try:
+        creds.refresh(Request())
+    except Exception as e:
+        # Common case: refresh_token was issued for the iOS OAuth client,
+        # but we're refreshing with the web client credentials → unauthorized_client.
+        # Can't recover server-side; surface a friendly error.
+        raise RuntimeError(
+            f"Google token refresh failed — please sign in again on mobile. ({e})"
+        )
 
     new_token = creds.token
     new_expires_at = int(creds.expiry.timestamp()) if creds.expiry else account.expires_at

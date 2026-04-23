@@ -4,6 +4,7 @@ POST /api/auth/mobile-token
 Mobile login entry point: exchange a provider (Google/Microsoft) access_token for
 our own JWT. Mirrors src/app/api/auth/mobile-token/route.ts on the Next.js side.
 """
+import time
 from typing import Literal, Optional
 
 import httpx
@@ -102,8 +103,15 @@ async def mobile_token(body: MobileTokenRequest):
             }
         }
     )
+    # Google access tokens last 1 hour. Reset expires_at on fresh login so the
+    # calendar service doesn't try (and fail) to refresh an unexpired token.
+    fresh_expires_at = int(time.time()) + 3600
+
     if existing:
-        update_data: dict = {"access_token": body.accessToken}
+        update_data: dict = {
+            "access_token": body.accessToken,
+            "expires_at": fresh_expires_at,
+        }
         if body.refreshToken:
             update_data["refresh_token"] = body.refreshToken
         await prisma.account.update(where={"id": existing.id}, data=update_data)
@@ -121,6 +129,7 @@ async def mobile_token(body: MobileTokenRequest):
                 "providerAccountId": provider_account_id,
                 "access_token": body.accessToken,
                 "refresh_token": body.refreshToken,
+                "expires_at": fresh_expires_at,
                 "token_type": "Bearer",
                 "scope": scope,
             }
