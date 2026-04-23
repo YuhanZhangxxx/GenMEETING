@@ -7,6 +7,7 @@ load_dotenv()
 from auth.deps import require_user
 from auth.jwt_utils import MobileTokenPayload
 from db import prisma, lifespan
+from routes import auth as auth_routes
 
 
 app = FastAPI(
@@ -15,6 +16,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.include_router(auth_routes.router, prefix="/api/auth")
 
 # 允许 Expo 和 Next.js 都能调
 app.add_middleware(
