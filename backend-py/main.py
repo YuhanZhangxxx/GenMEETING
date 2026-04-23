@@ -11,6 +11,7 @@ from routes import auth as auth_routes
 from routes import calendar as calendar_routes
 from routes import meetings as meetings_routes
 from routes import recommendations as recommendations_routes
+from routes import ai_advisor as ai_advisor_routes
 
 
 app = FastAPI(
@@ -33,6 +34,7 @@ app.include_router(auth_routes.router, prefix="/api/auth")
 app.include_router(calendar_routes.router, prefix="/api/calendar")
 app.include_router(meetings_routes.router, prefix="/api/meetings")
 app.include_router(recommendations_routes.router, prefix="/api/recommendations")
+app.include_router(ai_advisor_routes.router, prefix="/api/ai-advisor")
 
 
 @app.get("/health")
