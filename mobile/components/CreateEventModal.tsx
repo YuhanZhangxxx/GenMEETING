@@ -11,7 +11,7 @@ import {
   Alert,
   StyleSheet,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format, addMinutes } from "date-fns";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
@@ -26,6 +26,7 @@ interface Props {
 }
 
 type EventType = "meeting" | "activity";
+type Provider = "google" | "microsoft";
 const DURATIONS = [30, 45, 60, 90, 120];
 
 function roundUp30(d: Date) {
@@ -44,6 +45,28 @@ export default function CreateEventModal({ onClose, onSuccess }: Props) {
   const [description, setDescription] = useState("");
   const [addMeetLink, setAddMeetLink] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  // Which calendar to create on.
+  const [provider, setProvider] = useState<Provider>("google");
+  const [connectedProviders, setConnectedProviders] = useState<Provider[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.getConnectedAccounts();
+        const p = (res.accounts as Provider[]).filter(
+          (x) => x === "google" || x === "microsoft"
+        );
+        setConnectedProviders(p);
+        if (p.length > 0 && !p.includes(provider)) {
+          setProvider(p[0]);
+        }
+      } catch {
+        // Ignore — fall back to google.
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Picker visibility (iOS inline, Android modal)
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -109,6 +132,7 @@ export default function CreateEventModal({ onClose, onSuccess }: Props) {
         description: description.trim() || undefined,
         attendees: isMeeting ? attendees : [],
         addMeetLink: isMeeting ? addMeetLink : false,
+        provider,
       });
       onSuccess();
       onClose();
@@ -168,6 +192,44 @@ export default function CreateEventModal({ onClose, onSuccess }: Props) {
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Calendar source picker (only show if user has both linked) */}
+            {connectedProviders.length > 1 && (
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Calendar</Text>
+                <View style={styles.providerRow}>
+                  {connectedProviders.map((p) => {
+                    const active = provider === p;
+                    const color =
+                      p === "microsoft" ? Colors.microsoft : Colors.primary;
+                    const label =
+                      p === "microsoft" ? "Outlook" : "Google Calendar";
+                    return (
+                      <TouchableOpacity
+                        key={p}
+                        onPress={() => setProvider(p)}
+                        style={[
+                          styles.providerBtn,
+                          active && { borderColor: color, backgroundColor: color + "10" },
+                        ]}
+                      >
+                        <View
+                          style={[styles.providerDot, { backgroundColor: color }]}
+                        />
+                        <Text
+                          style={[
+                            styles.providerBtnText,
+                            active && { color, fontWeight: "700" },
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             {/* Title */}
             <View style={styles.field}>
@@ -331,7 +393,9 @@ export default function CreateEventModal({ onClose, onSuccess }: Props) {
                     <Ionicons name="checkmark" size={12} color="#fff" />
                   )}
                 </View>
-                <Text style={styles.checkLabel}>Add Google Meet link</Text>
+                <Text style={styles.checkLabel}>
+                  Add {provider === "microsoft" ? "Teams" : "Google Meet"} link
+                </Text>
               </TouchableOpacity>
             )}
           </ScrollView>
@@ -445,6 +509,26 @@ const styles = StyleSheet.create({
   hintText: { fontSize: 12, color: Colors.slate400 },
 
   pickerRow: { flexDirection: "row", gap: 8 },
+
+  providerRow: { flexDirection: "row", gap: 8 },
+  providerBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.slate200,
+    backgroundColor: "#fff",
+  },
+  providerDot: { width: 10, height: 10, borderRadius: 5 },
+  providerBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.slate600,
+  },
 
   attendeeInputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   attendeeAddBtn: {

@@ -63,6 +63,28 @@ function EventChip({ event }: { event: MeetingEvent }) {
           <Text style={styles.eventChipTime}>
             {format(start, "h:mm")}–{format(end, "h:mm a")}
           </Text>
+          <View
+            style={[
+              styles.chipSourceBadge,
+              {
+                backgroundColor:
+                  (event.source === "outlook" ? Colors.microsoft : Colors.primary) +
+                  "15",
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.chipSourceText,
+                {
+                  color:
+                    event.source === "outlook" ? Colors.microsoft : Colors.primary,
+                },
+              ]}
+            >
+              {event.source === "outlook" ? "Outlook" : "Google"}
+            </Text>
+          </View>
           {event.myResponseStatus && (
             <View
               style={[
@@ -421,6 +443,12 @@ const styles = StyleSheet.create({
   eventChipTitle: { fontSize: 14, fontWeight: "600", color: Colors.slate900 },
   eventChipMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
   eventChipTime: { fontSize: 12, color: Colors.slate500 },
+  chipSourceBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  chipSourceText: { fontSize: 9, fontWeight: "700" },
   rsvpDot: { width: 6, height: 6, borderRadius: 3 },
 
   emptyCard: {

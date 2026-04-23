@@ -112,6 +112,16 @@ function EventCard({ event, compact = false }: { event: MeetingEvent; compact?: 
         </View>
 
         <View style={styles.cardMetaRow}>
+          <View style={[styles.sourcePill, { backgroundColor: accent + "15" }]}>
+            <Ionicons
+              name={event.source === "outlook" ? "mail" : "logo-google"}
+              size={9}
+              color={accent}
+            />
+            <Text style={[styles.sourcePillText, { color: accent }]}>
+              {event.source === "outlook" ? "Outlook" : "Google"}
+            </Text>
+          </View>
           {event.isOrganizer && (
             <View style={styles.organizerPill}>
               <Ionicons name="star" size={9} color={Colors.primary} />
@@ -770,6 +780,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.primary,
   },
+  sourcePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  sourcePillText: { fontSize: 9, fontWeight: "700" },
   rsvpPill: {
     borderRadius: 6,
     paddingHorizontal: 6,
