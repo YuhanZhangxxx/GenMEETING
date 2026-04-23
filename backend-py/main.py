@@ -1,8 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 load_dotenv()
+
+from auth.deps import require_user
+from auth.jwt_utils import MobileTokenPayload
+
 
 app = FastAPI(
     title="MeetAI Python Backend",
@@ -23,3 +27,9 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"ok": True, "service": "meetai-backend-py"}
+
+
+@app.get("/api/me")
+def me(user: MobileTokenPayload = Depends(require_user)):
+    """测试鉴权是否生效 — 需要合法 Bearer token。"""
+    return {"user": user}
