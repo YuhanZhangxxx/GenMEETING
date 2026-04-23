@@ -12,8 +12,11 @@ import {
   StyleSheet,
 } from "react-native";
 import { useState } from "react";
-import { format, addMinutes, parseISO } from "date-fns";
+import { format, addMinutes } from "date-fns";
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { api } from "@/lib/api";
 import { Colors } from "@/constants/colors";
 
@@ -30,24 +33,67 @@ function roundUp30(d: Date) {
   return new Date(Math.ceil(d.getTime() / ms) * ms);
 }
 
-function toLocalISO(d: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function CreateEventModal({ onClose, onSuccess }: Props) {
   const defaultStart = roundUp30(new Date());
   const [eventType, setEventType] = useState<EventType>("meeting");
   const [title, setTitle] = useState("");
-  const [startISO, setStartISO] = useState(toLocalISO(defaultStart));
+  const [startDate, setStartDate] = useState<Date>(defaultStart);
   const [duration, setDuration] = useState(60);
   const [description, setDescription] = useState("");
   const [addMeetLink, setAddMeetLink] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Picker visibility (iOS inline, Android modal)
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  // Attendees
+  const [attendees, setAttendees] = useState<string[]>([]);
+  const [attendeeInput, setAttendeeInput] = useState("");
+
   const isMeeting = eventType === "meeting";
-  const startDate = parseISO(startISO);
   const endDate = addMinutes(startDate, duration);
+
+  function addAttendee() {
+    const email = attendeeInput.trim().toLowerCase();
+    if (!email) return;
+    if (!EMAIL_RE.test(email)) {
+      Alert.alert("Invalid email", `"${email}" doesn't look like an email.`);
+      return;
+    }
+    if (attendees.includes(email)) {
+      setAttendeeInput("");
+      return;
+    }
+    setAttendees([...attendees, email]);
+    setAttendeeInput("");
+  }
+
+  function removeAttendee(email: string) {
+    setAttendees(attendees.filter((a) => a !== email));
+  }
+
+  function onDateChange(_: DateTimePickerEvent, selected?: Date) {
+    setShowDatePicker(Platform.OS === "ios");
+    if (selected) {
+      // Preserve current time, only change date portion.
+      const next = new Date(startDate);
+      next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+      setStartDate(next);
+    }
+  }
+
+  function onTimeChange(_: DateTimePickerEvent, selected?: Date) {
+    setShowTimePicker(Platform.OS === "ios");
+    if (selected) {
+      // Preserve current date, only change time portion.
+      const next = new Date(startDate);
+      next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      setStartDate(next);
+    }
+  }
 
   async function handleSubmit() {
     if (!title.trim()) {
@@ -61,7 +107,7 @@ export default function CreateEventModal({ onClose, onSuccess }: Props) {
         startTime: startDate.toISOString(),
         endTime: endDate.toISOString(),
         description: description.trim() || undefined,
-        attendees: [],
+        attendees: isMeeting ? attendees : [],
         addMeetLink: isMeeting ? addMeetLink : false,
       });
       onSuccess();
@@ -138,18 +184,51 @@ export default function CreateEventModal({ onClose, onSuccess }: Props) {
               />
             </View>
 
-            {/* Start time (display only - simplified for mobile MVP) */}
+            {/* Start: tappable date + time pickers */}
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>Start</Text>
-              <View style={styles.timeDisplay}>
-                <Ionicons name="calendar-outline" size={16} color={Colors.slate400} />
-                <Text style={styles.timeDisplayText}>
-                  {format(startDate, "EEE MMM d 'at' h:mm a")}
-                </Text>
+              <View style={styles.pickerRow}>
+                <TouchableOpacity
+                  style={[styles.timeDisplay, { flex: 1 }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.timeDisplayText}>
+                    {format(startDate, "EEE MMM d")}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.timeDisplay, { flex: 1 }]}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.timeDisplayText}>
+                    {format(startDate, "h:mm a")}
+                  </Text>
+                </TouchableOpacity>
               </View>
               <Text style={styles.hintText}>
                 Ends at {format(endDate, "h:mm a")}
               </Text>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  minimumDate={new Date()}
+                  onChange={onDateChange}
+                />
+              )}
+              {showTimePicker && (
+                <DateTimePicker
+                  value={startDate}
+                  mode="time"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  minuteInterval={5}
+                  onChange={onTimeChange}
+                />
+              )}
             </View>
 
             {/* Duration */}
@@ -177,6 +256,51 @@ export default function CreateEventModal({ onClose, onSuccess }: Props) {
                 ))}
               </View>
             </View>
+
+            {/* Attendees (meetings only) */}
+            {isMeeting && (
+              <View style={styles.field}>
+                <Text style={styles.fieldLabel}>
+                  Attendees{" "}
+                  <Text style={{ color: Colors.slate400 }}>(optional)</Text>
+                </Text>
+                <View style={styles.attendeeInputRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    value={attendeeInput}
+                    onChangeText={setAttendeeInput}
+                    onSubmitEditing={addAttendee}
+                    placeholder="email@example.com"
+                    placeholderTextColor={Colors.slate400}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    returnKeyType="done"
+                  />
+                  <TouchableOpacity
+                    style={styles.attendeeAddBtn}
+                    onPress={addAttendee}
+                    disabled={!attendeeInput.trim()}
+                  >
+                    <Ionicons name="add" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                {attendees.length > 0 && (
+                  <View style={styles.attendeeChips}>
+                    {attendees.map((email) => (
+                      <View key={email} style={styles.attendeeChip}>
+                        <Text style={styles.attendeeChipText} numberOfLines={1}>
+                          {email}
+                        </Text>
+                        <TouchableOpacity onPress={() => removeAttendee(email)}>
+                          <Ionicons name="close-circle" size={16} color={Colors.slate400} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Description */}
             <View style={styles.field}>
@@ -317,8 +441,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
-  timeDisplayText: { fontSize: 15, color: Colors.slate700 },
+  timeDisplayText: { fontSize: 14, color: Colors.slate700, fontWeight: "600" },
   hintText: { fontSize: 12, color: Colors.slate400 },
+
+  pickerRow: { flexDirection: "row", gap: 8 },
+
+  attendeeInputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  attendeeAddBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  attendeeChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 6,
+  },
+  attendeeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 20,
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 6,
+    maxWidth: "100%",
+  },
+  attendeeChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.primary,
+    maxWidth: 180,
+  },
 
   durationRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   durationChip: {

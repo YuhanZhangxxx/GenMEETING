@@ -6,10 +6,11 @@ import {
   RefreshControl,
   StyleSheet,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { format, isToday, isTomorrow, parseISO } from "date-fns";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/store/auth";
 import { useEventsStore } from "@/store/events";
@@ -98,6 +99,7 @@ export default function HomeScreen() {
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiHasRun, setAiHasRun] = useState(false);
   const [actingId, setActingId] = useState<string | null>(null);
 
   const fetchAi = useCallback(async () => {
@@ -106,16 +108,14 @@ export default function HomeScreen() {
     try {
       const data = await api.getAIAdvisor();
       setAiSuggestions(data.suggestions ?? []);
+      setAiHasRun(true);
     } catch (e) {
       setAiError((e as Error).message);
+      setAiHasRun(true);
     } finally {
       setAiLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    fetchAi();
-  }, [fetchAi]);
 
   async function handleAiAction(s: AISuggestion, idx: number) {
     if (!s.eventId || !s.action) return;
@@ -203,68 +203,113 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* AI Suggestions */}
-        {(aiLoading || aiSuggestions.length > 0 || aiError) && (
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <Ionicons name="sparkles" size={14} color={Colors.purple} />
-              <Text style={[styles.sectionTitle, { color: Colors.purple }]}>
-                AI Advisor
-              </Text>
-              <TouchableOpacity onPress={fetchAi} disabled={aiLoading} style={{ marginLeft: "auto" }}>
-                <Ionicons
-                  name="refresh-outline"
-                  size={16}
-                  color={aiLoading ? Colors.slate300 : Colors.slate500}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {aiLoading && aiSuggestions.length === 0 && (
-              <View style={styles.aiLoadingCard}>
-                <Text style={styles.aiLoadingText}>Analyzing your calendar…</Text>
-              </View>
-            )}
-
-            {aiError && (
-              <View style={styles.aiErrorCard}>
-                <Text style={styles.aiErrorText}>{aiError}</Text>
-              </View>
-            )}
-
-            {aiSuggestions.map((s, i) => {
-              const meta = SUGGESTION_META[s.type];
-              const acting = actingId === `${i}`;
-              return (
-                <View key={i} style={styles.aiCard}>
-                  <View style={[styles.aiBadge, { backgroundColor: meta.bg }]}>
-                    <Ionicons name={meta.icon} size={14} color={meta.color} />
-                    <Text style={[styles.aiBadgeText, { color: meta.color }]}>
-                      {meta.label}
-                    </Text>
-                  </View>
-                  {s.eventTitle && (
-                    <Text style={styles.aiEventTitle} numberOfLines={1}>
-                      {s.eventTitle}
-                    </Text>
-                  )}
-                  <Text style={styles.aiMessage}>{s.message}</Text>
-                  {s.action && (
-                    <TouchableOpacity
-                      style={[styles.aiActionBtn, { backgroundColor: meta.color }]}
-                      onPress={() => handleAiAction(s, i)}
-                      disabled={!!actingId}
-                    >
-                      <Text style={styles.aiActionText}>
-                        {acting ? "Working…" : s.action.label}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
+        {/* AI Advisor */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="sparkles" size={14} color={Colors.purple} />
+            <Text style={[styles.sectionTitle, { color: Colors.purple }]}>
+              AI Advisor
+            </Text>
           </View>
-        )}
+
+          {/* Initial CTA (never analyzed yet) */}
+          {!aiHasRun && !aiLoading && (
+            <TouchableOpacity
+              style={styles.aiCTACard}
+              onPress={fetchAi}
+              activeOpacity={0.85}
+            >
+              <View style={styles.aiCTAIcon}>
+                <Ionicons name="sparkles" size={22} color="#fff" />
+              </View>
+              <Text style={styles.aiCTATitle}>Analyze my schedule</Text>
+              <Text style={styles.aiCTASub}>
+                Get AI suggestions for conflicts, RSVPs, and scheduling
+              </Text>
+              <View style={styles.aiCTABtn}>
+                <Ionicons name="arrow-forward" size={14} color="#fff" />
+                <Text style={styles.aiCTABtnText}>Run analysis</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Loading */}
+          {aiLoading && (
+            <View style={styles.aiLoadingCard}>
+              <ActivityIndicator size="small" color={Colors.purple} />
+              <Text style={styles.aiLoadingText}>
+                Analyzing your calendar…
+              </Text>
+            </View>
+          )}
+
+          {/* Error */}
+          {aiError && !aiLoading && (
+            <View style={styles.aiErrorCard}>
+              <Ionicons name="alert-circle-outline" size={16} color={Colors.red} />
+              <Text style={styles.aiErrorText}>{aiError}</Text>
+            </View>
+          )}
+
+          {/* Suggestions */}
+          {aiSuggestions.map((s, i) => {
+            const meta = SUGGESTION_META[s.type];
+            const acting = actingId === `${i}`;
+            return (
+              <View key={i} style={styles.aiCard}>
+                <View style={[styles.aiBadge, { backgroundColor: meta.bg }]}>
+                  <Ionicons name={meta.icon} size={14} color={meta.color} />
+                  <Text style={[styles.aiBadgeText, { color: meta.color }]}>
+                    {meta.label}
+                  </Text>
+                </View>
+                {s.eventTitle && (
+                  <Text style={styles.aiEventTitle} numberOfLines={1}>
+                    {s.eventTitle}
+                  </Text>
+                )}
+                <Text style={styles.aiMessage}>{s.message}</Text>
+                {s.action && (
+                  <TouchableOpacity
+                    style={[styles.aiActionBtn, { backgroundColor: meta.color }]}
+                    onPress={() => handleAiAction(s, i)}
+                    disabled={!!actingId}
+                  >
+                    <Text style={styles.aiActionText}>
+                      {acting ? "Working…" : s.action.label}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
+
+          {/* Re-analyze (after results) */}
+          {aiHasRun && !aiLoading && (
+            <TouchableOpacity
+              style={styles.aiReanalyzeBtn}
+              onPress={fetchAi}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="refresh-outline" size={14} color={Colors.purple} />
+              <Text style={styles.aiReanalyzeText}>
+                {aiSuggestions.length === 0 && !aiError
+                  ? "Re-analyze"
+                  : "Re-analyze"}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Empty after run */}
+          {aiHasRun && !aiLoading && !aiError && aiSuggestions.length === 0 && (
+            <View style={styles.aiEmptyCard}>
+              <Text style={styles.aiEmptyEmoji}>✨</Text>
+              <Text style={styles.aiEmptyText}>
+                Your schedule looks good! No suggestions right now.
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Today */}
         <View style={styles.section}>
@@ -425,6 +470,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 10,
   },
   aiLoadingText: { fontSize: 13, color: Colors.purple, fontWeight: "600" },
 
@@ -432,6 +480,94 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.redLight,
     borderRadius: 14,
     padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  aiErrorText: { fontSize: 12, color: Colors.red },
+  aiErrorText: { fontSize: 12, color: Colors.red, flex: 1 },
+
+  // Initial CTA
+  aiCTACard: {
+    backgroundColor: Colors.purple,
+    borderRadius: 18,
+    padding: 20,
+    alignItems: "center",
+    gap: 8,
+    shadowColor: Colors.purple,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  aiCTAIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  aiCTATitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+  aiCTASub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.85)",
+    textAlign: "center",
+    lineHeight: 17,
+    paddingHorizontal: 8,
+  },
+  aiCTABtn: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  aiCTABtnText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#fff",
+  },
+
+  // Re-analyze button
+  aiReanalyzeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.purpleLight,
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+  aiReanalyzeText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.purple,
+  },
+
+  // Empty state
+  aiEmptyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.slate100,
+    padding: 20,
+    alignItems: "center",
+    gap: 6,
+  },
+  aiEmptyEmoji: { fontSize: 28 },
+  aiEmptyText: {
+    fontSize: 13,
+    color: Colors.slate500,
+    textAlign: "center",
+  },
 });
