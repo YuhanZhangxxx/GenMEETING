@@ -75,10 +75,20 @@ async def get_valid_access_token(user_id: str) -> str:
 
 
 async def get_calendar_client(user_id: str):
-    """Authenticated Google Calendar v3 client."""
+    """Authenticated Google Calendar v3 client.
+
+    Pass refresh_token too so googleapiclient can auto-refresh if the token
+    happens to expire mid-request. Without it the client library errors with
+    'credentials do not contain the necessary fields'.
+    """
     access_token = await get_valid_access_token(user_id)
+    # Re-fetch account to grab the refresh_token for the Credentials object.
+    account = await prisma.account.find_first(
+        where={"userId": user_id, "provider": "google"}
+    )
     creds = Credentials(
         token=access_token,
+        refresh_token=account.refresh_token if account else None,
         token_uri=TOKEN_URI,
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
