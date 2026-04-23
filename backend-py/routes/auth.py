@@ -112,7 +112,12 @@ async def mobile_token(body: MobileTokenRequest):
             "access_token": body.accessToken,
             "expires_at": fresh_expires_at,
         }
-        if body.refreshToken:
+        # Only overwrite refresh_token if the existing record doesn't have one.
+        # Google Web OAuth and iOS OAuth issue separate refresh_tokens that can't
+        # be refreshed with each other's client credentials. The backend can only
+        # refresh Web-issued tokens (we have the Web client_secret), so if there's
+        # already a Web refresh_token stored, don't let a mobile login replace it.
+        if body.refreshToken and not existing.refresh_token:
             update_data["refresh_token"] = body.refreshToken
         await prisma.account.update(where={"id": existing.id}, data=update_data)
     else:
