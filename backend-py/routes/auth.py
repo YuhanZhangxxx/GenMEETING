@@ -8,10 +8,11 @@ import time
 from typing import Literal, Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from auth.jwt_utils import sign_mobile_jwt
+from auth.deps import require_user
+from auth.jwt_utils import MobileTokenPayload, sign_mobile_jwt
 from db import prisma
 
 
@@ -152,3 +153,10 @@ async def mobile_token(body: MobileTokenRequest):
             image=user.image,
         ),
     )
+
+
+@router.get("/connected-accounts")
+async def connected_accounts(user: MobileTokenPayload = Depends(require_user)):
+    """List providers the user has linked (e.g. ["google", "microsoft"])."""
+    accounts = await prisma.account.find_many(where={"userId": user["userId"]})
+    return {"accounts": [a.provider for a in accounts]}
