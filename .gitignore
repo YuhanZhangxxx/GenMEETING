@@ -53,3 +53,10 @@ next-env.d.ts
 /mobile/.expo
 /mobile/dist
 /mobile/.env.local
+
+# python backend
+/backend-py/.venv
+/backend-py/__pycache__
+/backend-py/**/__pycache__
+/backend-py/.env
+*.pyc
